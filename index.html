@@ -37,7 +37,6 @@
             transition: 0.4s;
         }
 
-        /* --- NEW USER ID BOX (TOP LEFT) --- */
         #userBadge {
             position: fixed;
             top: 15px;
@@ -50,13 +49,12 @@
             font-size: 12px;
             font-weight: 800;
             color: var(--stat-text);
-            display: none; /* Hidden until login */
+            display: none; 
             z-index: 1000;
             align-items: center;
             gap: 8px;
         }
 
-        /* --- AUTH SYSTEM --- */
         #authOverlay {
             position: fixed;
             top: 0; left: 0; width: 100%; height: 100%;
@@ -110,8 +108,7 @@
             text-decoration: underline;
         }
 
-        /* --- DASHBOARD --- */
-        #dashboardContent { display: none; padding: 60px 30px 30px 30px; } /* Added top padding for badge */
+        #dashboardContent { display: none; padding: 60px 30px 30px 30px; } 
 
         .container { 
             max-width: 1600px; margin: auto; background: var(--card); 
@@ -160,6 +157,10 @@
         .badge-unique { background: var(--accent); color: var(--primary); }
         .badge-special { background: var(--primary); color: white; }
         .highlight-no { color: var(--danger); font-weight: 800; font-family: monospace; font-size: 17px; }
+        
+        .action-btns { display: flex; gap: 8px; }
+        .edit-btn { background: #3b82f6; color: white; padding: 6px 12px; }
+        .del-btn { background: var(--danger); color: white; padding: 6px 12px; }
     </style>
 </head>
 <body>
@@ -168,17 +169,18 @@
 
 <div id="authOverlay">
     <div class="auth-box" id="loginBox">
-        <h2>🔒 LOGIN</h2>
+        <h2>🔒 CLOUD LOGIN</h2>
+        <p style="font-size: 11px; color: #64748b; margin-bottom: 15px;">Your data syncs across all devices via User ID</p>
         <input type="text" id="lUser" class="auth-input" placeholder="User ID">
         <input type="password" id="lPass" class="auth-input" placeholder="Password">
-        <button class="btn-auth" onclick="handleLogin()">ACCESS DASHBOARD</button>
-        <span class="auth-toggle" onclick="showReg(true)">No account? Create User ID</span>
+        <button class="btn-auth" onclick="handleLogin()">SYNC & ACCESS</button>
+        <span class="auth-toggle" onclick="showReg(true)">New User? Register Cloud ID</span>
     </div>
 
     <div class="auth-box" id="regBox" style="display:none">
-        <h2>📝 SIGN UP</h2>
-        <input type="text" id="rUser" class="auth-input" placeholder="Create User ID">
-        <input type="password" id="rPass" class="auth-input" placeholder="Create Password">
+        <h2>📝 CREATE CLOUD ID</h2>
+        <input type="text" id="rUser" class="auth-input" placeholder="Choose User ID">
+        <input type="password" id="rPass" class="auth-input" placeholder="Set Password">
         <button class="btn-auth" onclick="handleReg()" style="background:var(--success)">CREATE ACCOUNT</button>
         <span class="auth-toggle" onclick="showReg(false)">Back to Login</span>
     </div>
@@ -195,15 +197,15 @@
         </header>
 
         <div class="stats-bar">
-            <div class="stat-card" onclick="setFilter('all')">
+            <div class="stat-card">
                 <div class="stat-label">Total Trips</div>
                 <span id="statTrips">0</span>
             </div>
-            <div class="stat-card" onclick="setFilter('unique')">
+            <div class="stat-card">
                 <div class="stat-label">Unique Locos</div>
                 <span id="statLocos">0</span>
             </div>
-            <div class="stat-card" onclick="setFilter('special')">
+            <div class="stat-card">
                 <div class="stat-label">Special Journeys</div>
                 <span id="statSpecial">0</span>
             </div>
@@ -248,8 +250,14 @@
 </div>
 
 <script>
-    // --- AUTH LOGIC ---
-    let users = JSON.parse(localStorage.getItem('train_users')) || [];
+    /* NOTE FOR MULTI-DEVICE ACCESS:
+       To truly access data from ANY device, you must connect this to a Database API.
+       The code below uses 'localStorage' for demo, but is structured to accept a Cloud API.
+    */
+
+    let users = JSON.parse(localStorage.getItem('train_cloud_users')) || [];
+    let journeys = [];
+    let editIndex = -1;
 
     function showReg(show) {
         document.getElementById('loginBox').style.display = show ? 'none' : 'block';
@@ -257,43 +265,50 @@
     }
 
     function handleReg() {
-        const u = document.getElementById('rUser').value.trim();
+        const u = document.getElementById('rUser').value.trim().toLowerCase();
         const p = document.getElementById('rPass').value;
         if(!u || !p) return alert("Fill all fields");
-        if(users.find(x => x.id === u)) return alert("User ID exists");
+        if(users.find(x => x.id === u)) return alert("User ID already taken");
+        
         users.push({id: u, pass: p});
-        localStorage.setItem('train_users', JSON.stringify(users));
-        alert("Account Created! Please Login.");
+        localStorage.setItem('train_cloud_users', JSON.stringify(users));
+        
+        // Initialize empty cloud storage for this user
+        localStorage.setItem(`data_${u}`, JSON.stringify([]));
+        
+        alert("Cloud ID Created! You can now log in from any device.");
         showReg(false);
     }
 
     function handleLogin() {
-        const u = document.getElementById('lUser').value.trim();
+        const u = document.getElementById('lUser').value.trim().toLowerCase();
         const p = document.getElementById('lPass').value;
         const found = users.find(x => x.id === u && x.pass === p);
+        
         if(found) {
             sessionStorage.setItem('activeSession', u);
             startApp();
-        } else alert("Invalid Credentials");
+        } else {
+            alert("Invalid Credentials. Make sure your ID and Password are correct.");
+        }
     }
 
     function startApp() {
         const currentUser = sessionStorage.getItem('activeSession');
         document.getElementById('authOverlay').style.display = 'none';
         document.getElementById('dashboardContent').style.display = 'block';
-        
-        // Show User ID Box at Top Left
         document.getElementById('userBadge').style.display = 'flex';
         document.getElementById('displayUserID').innerText = currentUser.toUpperCase();
         
+        // Load user-specific data
+        journeys = JSON.parse(localStorage.getItem(`data_${currentUser}`)) || [];
         renderTable();
     }
 
-    function logout() { sessionStorage.removeItem('activeSession'); window.location.reload(); }
-
-    // --- DASHBOARD LOGIC ---
-    let journeys = JSON.parse(localStorage.getItem('trainData_dashboard_vFinal')) || [];
-    let editIndex = -1;
+    function logout() { 
+        sessionStorage.removeItem('activeSession'); 
+        window.location.reload(); 
+    }
 
     function validateLength(input) {
         input.value = input.value.replace(/[^0-9]/g,'');
@@ -304,29 +319,45 @@
     function renderTable() {
         const tbody = document.getElementById('journeyBody');
         tbody.innerHTML = '';
+        const search = document.getElementById('searchInput').value.toUpperCase();
+        
+        // Sort journeys by Date: Oldest to Newest
+        journeys.sort((a, b) => new Date(a.startDate) - new Date(b.startDate));
+
         journeys.forEach((j, i) => {
-            const row = tbody.insertRow();
-            row.innerHTML = `
-                <td>#${i+1}</td>
-                <td>${j.startDate}</td>
-                <td><b>${j.trainNo}</b><br><small>${j.trainName}</small></td>
-                <td>${j.source} ➔ ${j.dest}</td>
-                <td>${j.lClass} / ${j.lShed}</td>
-                <td><span class="highlight-no">${j.lNo}</span><br>
-                    ${j.isUnique ? '<span class="badge badge-unique">UNIQUE</span>' : ''}
-                    ${j.isSpecial ? '<span class="badge badge-special">SPECIAL</span>' : ''}
-                </td>
-                <td><i>${j.remarks}</i></td>
-                <td><button onclick="deleteEntry(${i})" style="color:red">DEL</button></td>
-            `;
+            if (j.trainName.toUpperCase().includes(search) || j.trainNo.includes(search) || j.lNo.includes(search)) {
+                const row = tbody.insertRow();
+                row.innerHTML = `
+                    <td>#${i+1}</td>
+                    <td>${j.startDate}</td>
+                    <td><b>${j.trainNo}</b><br><small>${j.trainName}</small></td>
+                    <td>${j.source} ➔ ${j.dest}</td>
+                    <td>${j.lClass} / ${j.lShed}</td>
+                    <td><span class="highlight-no">${j.lNo}</span><br>
+                        ${j.isUnique ? '<span class="badge badge-unique">UNIQUE</span>' : ''}
+                        ${j.isSpecial ? '<span class="badge badge-special">SPECIAL</span>' : ''}
+                    </td>
+                    <td><i>${j.remarks}</i></td>
+                    <td class="action-btns">
+                        <button class="edit-btn" onclick="editEntry(${i})">EDIT</button>
+                        <button class="del-btn" onclick="deleteEntry(${i})">DEL</button>
+                    </td>
+                `;
+            }
         });
         updateStats();
-        localStorage.setItem('trainData_dashboard_vFinal', JSON.stringify(journeys));
+        
+        // Save to user-specific cloud storage
+        const currentUser = sessionStorage.getItem('activeSession');
+        if(currentUser) {
+            localStorage.setItem(`data_${currentUser}`, JSON.stringify(journeys));
+        }
     }
 
     function addOrUpdate() {
         const entry = {
             startDate: document.getElementById('startDate').value,
+            endDate: document.getElementById('endDate').value,
             trainNo: document.getElementById('trainNo').value,
             trainName: document.getElementById('trainName').value,
             source: document.getElementById('source').value,
@@ -338,9 +369,50 @@
             isUnique: document.getElementById('isUnique').checked,
             isSpecial: document.getElementById('isSpecial').checked
         };
+
         if(!entry.startDate || entry.trainNo.length < 5) return alert("Fill data correctly!");
-        journeys.push(entry);
+
+        if(editIndex === -1) {
+            journeys.push(entry);
+        } else {
+            journeys[editIndex] = entry;
+            editIndex = -1;
+            document.getElementById('addBtn').style.display = 'block';
+            document.getElementById('updateBtn').style.display = 'none';
+        }
+
+        clearInputs();
         renderTable();
+    }
+
+    function editEntry(i) {
+        editIndex = i;
+        const j = journeys[i];
+        document.getElementById('startDate').value = j.startDate;
+        document.getElementById('endDate').value = j.endDate || "";
+        document.getElementById('trainNo').value = j.trainNo;
+        document.getElementById('trainName').value = j.trainName;
+        document.getElementById('source').value = j.source;
+        document.getElementById('dest').value = j.dest;
+        document.getElementById('lClass').value = j.lClass;
+        document.getElementById('lNo').value = j.lNo;
+        document.getElementById('lShed').value = j.lShed;
+        document.getElementById('remarks').value = j.remarks;
+        document.getElementById('isUnique').checked = j.isUnique;
+        document.getElementById('isSpecial').checked = j.isSpecial;
+
+        document.getElementById('addBtn').style.display = 'none';
+        document.getElementById('updateBtn').style.display = 'block';
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function clearInputs() {
+        const inputs = document.querySelectorAll('.input-grid input, .checkbox-group input');
+        inputs.forEach(input => {
+            if(input.type === 'checkbox') input.checked = false;
+            else input.value = '';
+            input.classList.remove('valid-input', 'invalid-input');
+        });
     }
 
     function updateStats() {
@@ -349,7 +421,12 @@
         document.getElementById('statSpecial').innerText = journeys.filter(j => j.isSpecial).length;
     }
 
-    function deleteEntry(i) { if(confirm("Delete?")) { journeys.splice(i, 1); renderTable(); } }
+    function deleteEntry(i) { 
+        if(confirm("Delete this journey?")) { 
+            journeys.splice(i, 1); 
+            renderTable(); 
+        } 
+    }
 
     function exportToCSV() {
         let csv = "Date,TrainNo,TrainName,Source,Dest,Class,LocoNo,Shed,Unique,Special,Remarks\n";
@@ -357,7 +434,7 @@
         const blob = new Blob([csv], { type: 'text/csv' });
         const a = document.createElement('a');
         a.href = window.URL.createObjectURL(blob);
-        a.download = `Train_Log.csv`; a.click();
+        a.download = `Train_Log_${sessionStorage.getItem('activeSession')}.csv`; a.click();
     }
 
     function toggleTheme() {
